@@ -67,6 +67,7 @@ install_deb $SERVER_PACKAGE
 install_deb $DEVEL_PACKAGE
 install_deb $UNITTEST_PACKAGE
 install_deb $SHRINKWRAP_PACKAGE
+install_deb $GATEWAY_PACKAGE
 
 # installing WSGI apache module
 echo "installing apache2 and python WSGI module..."
@@ -133,23 +134,6 @@ else
   # fuse-overlayfs requires Ubuntu 20.04+
   if [ "x$ubuntu_release" != "xbionic" ]; then
     install_from_repo fuse-overlayfs || die "fail (installing fuse-overlayfs)"
-  fi
-fi
-
-# On Ubuntu 16.04+ 64bit install the repository gateway
-if [ "x$(uname -m)" = "xx86_64" ]; then
-  package_map=""
-  if [ "x$ubuntu_release" = "xxenial" ]; then
-    package_map="pkgmap.ubuntu1604_x86_64"
-  elif [ "x$ubuntu_release" = "xbionic" ]; then
-    package_map="pkgmap.ubuntu1804_x86_64"
-  elif [ "x$ubuntu_release" = "xfocal" ]; then
-    package_map="pkgmap.ubuntu2004_x86_64"
-  fi
-
-  if [ "x$package_map" != "x" ]; then
-    echo "Installing repository gateway"
-    install_package ${GATEWAY_BUILD_URL} $package_map || die "fail (downloading cvmfs-gateway)"
   fi
 fi
 

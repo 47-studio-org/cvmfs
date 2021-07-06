@@ -70,6 +70,7 @@ static inline bool EscapeUrlChar(char input, char output[3]) {
       ((input >= 'A') && (input <= 'Z')) ||
       ((input >= 'a') && (input <= 'z')) ||
       (input == '/') || (input == ':') || (input == '.') ||
+      (input == '@') ||
       (input == '+') || (input == '-') ||
       (input == '_') || (input == '~') ||
       (input == '[') || (input == ']') || (input == ','))
@@ -284,7 +285,7 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
         zlib::DecompressZStream2Sink(ptr, num_bytes,
                                      &info->zstream, info->destination_sink);
       if (retval == zlib::kStreamDataError) {
-        LogCvmfs(kLogDownload, kLogDebug, "failed to decompress %s",
+        LogCvmfs(kLogDownload, kLogSyslogErr, "failed to decompress %s",
                  info->url->c_str());
         info->error_code = kFailBadData;
         return 0;
@@ -332,7 +333,7 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
         zlib::DecompressZStream2File(ptr, num_bytes,
                                      &info->zstream, info->destination_file);
       if (retval == zlib::kStreamDataError) {
-        LogCvmfs(kLogDownload, kLogDebug, "failed to decompress %s",
+        LogCvmfs(kLogDownload, kLogSyslogErr, "failed to decompress %s",
                  info->url->c_str());
         info->error_code = kFailBadData;
         return 0;
@@ -344,7 +345,7 @@ static size_t CallbackCurlData(void *ptr, size_t size, size_t nmemb,
       }
     } else {
       if (fwrite(ptr, 1, num_bytes, info->destination_file) != num_bytes) {
-       LogCvmfs(kLogDownload, kLogDebug,
+       LogCvmfs(kLogDownload, kLogSyslogErr,
                  "downloading %s, IO failure: %s (errno=%d)",
                  info->url->c_str(), strerror(errno), errno);
         info->error_code = kFailLocalIO;

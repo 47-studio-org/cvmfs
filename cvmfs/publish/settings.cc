@@ -66,6 +66,10 @@ void SettingsTransaction::SetLayoutRevision(const unsigned revision) {
   layout_revision_ = revision;
 }
 
+void SettingsTransaction::SetInEnterSession(const bool value) {
+  in_enter_session_ = value;
+}
+
 void SettingsTransaction::SetBaseHash(const shash::Any &hash) {
   base_hash_ = hash;
 }
@@ -448,6 +452,15 @@ SettingsRepository SettingsBuilder::CreateSettingsRepository(
   return settings;
 }
 
+std::string SettingsPublisher::GetReadOnlyXAttr(const std::string &attr) {
+  std::string value;
+  bool rvb = platform_getxattr(this->transaction().spool_area().readonly_mnt(),
+                               attr, &value);
+  if (!rvb) {
+    throw EPublish("cannot get extended attribute " + attr);
+  }
+  return value;
+}
 
 SettingsPublisher* SettingsBuilder::CreateSettingsPublisherFromSession() {
   std::string session_dir = Env::GetEnterSessionDir();
@@ -457,16 +470,12 @@ SettingsPublisher* SettingsBuilder::CreateSettingsPublisherFromSession() {
   UniquePtr<SettingsPublisher> settings_publisher(
       new SettingsPublisher(SettingsRepository(fqrn)));
   // TODO(jblomer): work in progress
+  settings_publisher->GetTransaction()->SetInEnterSession(true);
   settings_publisher->GetTransaction()->GetSpoolArea()->SetSpoolArea(
     session_dir);
 
-  std::string xattr;
-  bool rvb = platform_getxattr(
-    settings_publisher->transaction().spool_area().readonly_mnt(),
-    "user.root_hash", &xattr);
-  if (!rvb) {
-    throw EPublish("cannot get extrended attribute root_hash");
-  }
+  std::string base_hash =
+    settings_publisher->GetReadOnlyXAttr("user.root_hash");
 
   BashOptionsManager omgr;
   omgr.set_taint_environment(false);
@@ -474,14 +483,13 @@ SettingsPublisher* SettingsBuilder::CreateSettingsPublisherFromSession() {
                  false /* external */);
 
   std::string arg;
-  if (omgr.GetValue("CVMFS_SERVER_URL", &arg))
-    settings_publisher->SetUrl(arg);
+  settings_publisher->SetUrl(settings_publisher->GetReadOnlyXAttr("user.host"));
   if (omgr.GetValue("CVMFS_KEYS_DIR", &arg))
     settings_publisher->GetKeychain()->SetKeychainDir(arg);
   settings_publisher->GetTransaction()->SetLayoutRevision(
     Publisher::kRequiredLayoutRevision);
   settings_publisher->GetTransaction()->SetBaseHash(shash::MkFromHexPtr(
-    shash::HexPtr(xattr), shash::kSuffixCatalog));
+    shash::HexPtr(base_hash), shash::kSuffixCatalog));
   settings_publisher->GetTransaction()->SetUnionFsType("overlayfs");
   settings_publisher->SetOwner(geteuid(), getegid());
 
@@ -515,11 +523,23 @@ SettingsPublisher* SettingsBuilder::CreateSettingsPublisher(
   if (needs_managed && !IsManagedRepository())
     throw EPublish("remote repositories are not supported in this context");
 
-  if (options_mgr_->GetValueOrDie("CVMFS_REPOSITORY_TYPE") != "stratum0")
-    throw EPublish("Not a stratum 0 repository");
+  if (options_mgr_->GetValueOrDie("CVMFS_REPOSITORY_TYPE") != "stratum0") {
+    throw EPublish("Repository " + alias + " is not a stratum 0 repository",
+                   EPublish::kFailRepositoryType);
+  }
 
   UniquePtr<SettingsPublisher> settings_publisher(
       new SettingsPublisher(settings_repository));
+
+  try {
+    std::string xattr = settings_publisher->GetReadOnlyXAttr("user.root_hash");
+    settings_publisher->GetTransaction()->SetBaseHash(
+        shash::MkFromHexPtr(shash::HexPtr(xattr), shash::kSuffixCatalog));
+  } catch (const EPublish& e) {
+    // We ignore the exception.
+    // In case of exception, the base hash remains unset.
+  }
+
   settings_publisher->SetIsManaged(IsManagedRepository());
   settings_publisher->SetOwner(options_mgr_->GetValueOrDie("CVMFS_USER"));
   settings_publisher->GetStorage()->SetLocator(

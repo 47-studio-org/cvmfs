@@ -5,7 +5,7 @@
 # See externals/CMake-Register_External_Lib.txt for details on external inclusion
 #
 
-cmake_minimum_required (VERSION 2.6.2)
+cmake_minimum_required (VERSION 2.6.2...3.12)
 set (PROJECT_NAME "CernVM-FS")
 project (${PROJECT_NAME})
 
@@ -469,9 +469,17 @@ if (BUILD_QC_TESTS)
   add_subdirectory (test/quickcheck)
 endif(BUILD_QC_TESTS)
 
+if (BUILD_GATEWAY)
+  add_subdirectory (gateway)
+endif(BUILD_GATEWAY)
+
 if (BUILD_DUCC)
   add_subdirectory (ducc)
 endif(BUILD_DUCC)
+
+if (BUILD_SNAPSHOTTER)
+  add_subdirectory (snapshotter)
+endif(BUILD_SNAPSHOTTER)
 
 if (BUILD_STRESS_TESTS)
   include(test/stress/CMakeLists.txt)
